@@ -11,205 +11,111 @@ public:
   SetPlaying(GstElement *);
   ~SetPlaying();
 
-  void run ();
+  void run();
 
 private:
-  GstElement * pipeline_;
+  GstElement *pipeline_;
 };
 
-SetPlaying::SetPlaying (GstElement * pipeline)
+SetPlaying::SetPlaying(GstElement *pipeline)
 {
-  this->pipeline_ = pipeline ? static_cast<GstElement *> (gst_object_ref (pipeline)) : NULL;
+  this->pipeline_ = pipeline ? static_cast<GstElement *>(gst_object_ref(pipeline)) : NULL;
 }
 
-SetPlaying::~SetPlaying ()
+SetPlaying::~SetPlaying()
 {
   if (this->pipeline_)
-    gst_object_unref (this->pipeline_);
+    gst_object_unref(this->pipeline_);
 }
 
-void
-SetPlaying::run ()
+void SetPlaying::run()
 {
   if (this->pipeline_)
   {
-      qDebug() << "omaddd";
-    gst_element_set_state (this->pipeline_, GST_STATE_PLAYING);
+    qDebug() << "Setting pipeline to PLAYING state";
+    gst_element_set_state(this->pipeline_, GST_STATE_PLAYING);
   }
 }
 
 int main(int argc, char *argv[])
 {
-    setenv("GST_DEBUG_DUMP_DOT_DIR" , "/tmp" , 1);
+  // Set environment variable for GStreamer debug output
+  setenv("GST_DEBUG_DUMP_DOT_DIR", "/tmp", 1);
 
   int ret;
-  gst_init (&argc, &argv);
+  gst_init(&argc, &argv);
 
   {
     QGuiApplication app(argc, argv);
 
-    GstElement *pipeline = gst_pipeline_new (NULL);
-//#define MULTIFILESRC
-//#define IMAGEFREEZE
-//#define VIDEOTESTSRC
-//#define IMAGEFREEZE1
-#define TESTAUTOVIDEOSINK
+    GstElement *pipeline = gst_pipeline_new("video-pipeline");
 
-#ifdef MULTIFILESRC
-    //    gst-launch-1.0 filesrc location=/home/mohammad/Videos/sintel_trailer-480p.mp4 ! qtdemux ! avdec_h264 ! autovideosink
+    // Use a `filesrc` to load a video file
+    GstElement *src = gst_element_factory_make("filesrc", "file-source");
+    g_object_set(src, "location", "/path/to/your/video.mp4", NULL);  // Specify your video file path here
 
-    GstElement *src = gst_element_factory_make ("multifilesrc", NULL);
+    // Set up the demuxer and decoder elements for the video file
+    GstElement *demuxer = gst_element_factory_make("qtdemux", "demuxer"); // e.g., qtdemux for MP4
+    GstElement *decoder = gst_element_factory_make("avdec_h264", "decoder"); // H.264 decoder
 
-    g_object_set(src , "location" , "/home/mohammad/Pictures/myimage%d.jpeg" ,NULL);
-    g_object_set(src , "loop" , true, "index", 0 , NULL);
+    // Additional pipeline elements
+    GstElement *videoconvert = gst_element_factory_make("videoconvert", "converter");
+    GstElement *glupload = gst_element_factory_make("glupload", "gl-upload");
+    GstElement *sink = gst_element_factory_make("qmlglsink", "qml-sink");
 
-//    g_object_set(src , "caps" , "image/jpeg,framerate=\(fraction\)12/1" , NULL);
-    GstElement *jpegdec = gst_element_factory_make("jpegdec" , NULL);
-
-    GstElement *glupload = gst_element_factory_make ("glupload", NULL);
-    GstElement *glcolorconvert = gst_element_factory_make("glcolorconvert",NULL);
-    GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
-
-    g_assert (src && jpegdec && glupload && glcolorconvert && sink);
-
-    gst_bin_add_many (GST_BIN (pipeline), src, jpegdec, glupload, glcolorconvert, sink, NULL);
-    if(gst_element_link_many (src, jpegdec, glupload, glcolorconvert, sink, NULL)
-       != TRUE) {
-        g_printerr("Elements could not be linked.\n");
-        gst_object_unref(pipeline);
-        return 1;
+    // Verify that all elements were created
+    if (!pipeline || !src || !demuxer || !decoder || !videoconvert || !glupload || !sink) {
+      g_printerr("Failed to create one or more GStreamer elements.\n");
+      return -1;
     }
 
-#endif
-#ifdef IMAGEFREEZE
-    GstElement *src = gst_element_factory_make ("filesrc", NULL);
-
-    g_object_set(src , "location" , "/home/mohammad/Pictures/myimage0.jpeg" ,NULL);
-    GstElement *jpegdec = gst_element_factory_make("jpegdec" , NULL);
-    GstElement *imagefreeze = gst_element_factory_make("imagefreeze" , NULL);
-    GstElement *glupload = gst_element_factory_make ("glupload", NULL);
-    GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
-    g_assert(jpegdec);
-
-    g_assert(imagefreeze);
-    g_assert (src && glupload && sink);
-
-    gst_bin_add_many (GST_BIN (pipeline), src, jpegdec, imagefreeze, glupload, sink, NULL);
-
-    if (!src || !jpegdec ||
-        !glupload || !sink)
-    {
-        g_printerr("Not all elements could be created.\n");
-        return 1;
-    }
-    if (gst_element_link_many(src , jpegdec  , imagefreeze, glupload, sink, NULL)
-          != TRUE)
-    {
-        g_printerr("Elements could not be linked.\n");
-        gst_object_unref(pipeline);
-    }
-#endif
-#ifdef IMAGEFREEZE1
-    GstElement *src = gst_element_factory_make ("filesrc", NULL);
-    g_object_set(src , "location" , "/home/mohammad/Pictures/myimage0.jpeg" ,NULL);
-    GstElement *jpegdec = gst_element_factory_make("jpegdec" , NULL);
-    GstElement *imagefreeze = gst_element_factory_make("imagefreeze" , NULL);
-
-    GstElement *glupload = gst_element_factory_make ("glupload", NULL);
-    /* the plugin must be loaded before loading the qml file to register the
-     * GstGLVideoItem qml item */
-    GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
-
-    g_assert (src && jpegdec && imagefreeze && glupload && sink);
-
-    gst_bin_add_many (GST_BIN (pipeline), src, jpegdec, imagefreeze, glupload, sink, NULL);
-    if(gst_element_link_many (src, jpegdec, imagefreeze, glupload, sink, NULL)
-       != TRUE) {
-        g_printerr("Elements could not be linked.\n");
-        gst_object_unref(pipeline);
-        return 1;
+    // Assemble the pipeline
+    gst_bin_add_many(GST_BIN(pipeline), src, demuxer, decoder, videoconvert, glupload, sink, NULL);
+    
+    // Link the elements
+    if (!gst_element_link(src, demuxer)) {
+      g_printerr("Failed to link src and demuxer.\n");
+      gst_object_unref(pipeline);
+      return -1;
     }
 
-#endif
+    // Connect demuxer to decoder dynamically
+    g_signal_connect(demuxer, "pad-added", G_CALLBACK(+[](GstElement *src, GstPad *new_pad, GstElement *decoder) {
+      GstPad *sink_pad = gst_element_get_static_pad(decoder, "sink");
+      gst_pad_link(new_pad, sink_pad);
+      gst_object_unref(sink_pad);
+    }), decoder);
 
-#ifdef TESTAUTOVIDEOSINK
-    GstElement *src = gst_element_factory_make ("filesrc", NULL);
-    g_object_set(src , "location" , "/home/mohammad/Pictures/myimage0.jpeg" ,NULL);
-    GstElement *jpegdec = gst_element_factory_make("jpegdec" , NULL);
-    GstElement *imagefreeze = gst_element_factory_make("imagefreeze" , NULL);
-
-    GstElement *videorate = gst_element_factory_make("videorate" , NULL);
-
-    GstElement *videorateCapsElement = gst_element_factory_make("capsfilter", NULL);
-    GstCaps *videorateCaps = gst_caps_from_string("video/x-raw,framerate=1/10");
-    g_object_set(videorateCapsElement, "caps", videorateCaps, NULL);
-
-    GstElement *glupload = gst_element_factory_make ("glupload", NULL);
-    GstElement *glcolorconvert = gst_element_factory_make("glcolorconvert",NULL);
-
-    /* the plugin must be loaded before loading the qml file to register the
-     * GstGLVideoItem qml item */
-    GstElement *sinkqml = gst_element_factory_make ("qmlglsink", NULL);
-    GstElement *autovideosink = gst_element_factory_make ("autovideosink", NULL);
-
-    GstElement *sink = sinkqml;
-    g_assert (src && jpegdec && imagefreeze
-              && videorate && videorateCapsElement
-              && glupload
-              && glcolorconvert
-              && sink);
-
-    gst_bin_add_many (GST_BIN (pipeline), src, jpegdec, imagefreeze, videorate,
-                      videorateCapsElement, glupload, glcolorconvert, sink, NULL);
-    if(gst_element_link_many (src, jpegdec, imagefreeze, videorate, videorateCapsElement,
-                              glupload, glcolorconvert, sink, NULL)
-       != TRUE) {
-        g_printerr("Elements could not be linked.\n");
-        gst_object_unref(pipeline);
-        return 1;
+    // Link the rest of the pipeline
+    if (!gst_element_link_many(decoder, videoconvert, glupload, sink, NULL)) {
+      g_printerr("Failed to link decoder to sink.\n");
+      gst_object_unref(pipeline);
+      return -1;
     }
 
-#endif
-
-#ifdef VIDEOTESTSRC
-    GstElement *src = gst_element_factory_make ("videotestsrc", NULL);
-    GstElement *glupload = gst_element_factory_make ("glupload", NULL);
-    /* the plugin must be loaded before loading the qml file to register the
-     * GstGLVideoItem qml item */
-    GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
-
-    g_assert (src && glupload && sink);
-
-    gst_bin_add_many (GST_BIN (pipeline), src, glupload, sink, NULL);
-    gst_element_link_many (src, glupload, sink, NULL);
-
-#endif
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "piplineLinked");
+    // Start Qt application and load QML
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 
-    QQuickItem *videoItem;
-    QQuickWindow *rootObject;
-
-    /* find and set the videoItem on the sink */
-    rootObject = static_cast<QQuickWindow *> (engine.rootObjects().first());
-    videoItem = rootObject->findChild<QQuickItem *> ("videoItem");
-    g_assert (videoItem);
+    QQuickWindow *rootObject = static_cast<QQuickWindow *>(engine.rootObjects().first());
+    QQuickItem *videoItem = rootObject->findChild<QQuickItem *>("videoItem");
+    if (!videoItem) {
+      g_printerr("Failed to find videoItem in QML.\n");
+      return -1;
+    }
     g_object_set(sink, "widget", videoItem, NULL);
 
-    rootObject->scheduleRenderJob (new SetPlaying (pipeline),
-        QQuickWindow::BeforeSynchronizingStage);
+    // Schedule the pipeline to play
+    rootObject->scheduleRenderJob(new SetPlaying(pipeline), QQuickWindow::BeforeSynchronizingStage);
 
     ret = app.exec();
-    qDebug() << "after";
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "piplinePlay");
 
-    gst_element_set_state (pipeline, GST_STATE_NULL);
-    gst_object_unref (pipeline);
-
+    // Clean up GStreamer pipeline after Qt application ends
+    gst_element_set_state(pipeline, GST_STATE_NULL);
+    gst_object_unref(pipeline);
   }
 
-  gst_deinit ();
+  gst_deinit();
 
   return ret;
 }
